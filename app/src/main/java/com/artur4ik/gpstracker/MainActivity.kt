@@ -10,43 +10,63 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
 import android.provider.Settings
-import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.gms.location.*
 import com.google.android.gms.tasks.OnCompleteListener
 import kotlinx.android.synthetic.main.activity_main.*
+import java.util.*
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), View.OnClickListener {
     private val PERMISSION_ID = 44
     private lateinit var mFusedLocationClient: FusedLocationProviderClient
+    private lateinit var adapterLocationView:LocationAdapterView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this@MainActivity)
 
-        button.setOnClickListener {
-            getLastLocation()
+        adapterLocationView = LocationAdapterView()
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.adapter = adapterLocationView
+
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this@MainActivity)
+        buttonClear.setOnClickListener(this)
+        button.setOnClickListener(this)
+    }
+
+    override fun onClick(view: View?) {
+        when(view?.id){
+            button.id -> getLastLocation()
+            buttonClear.id -> clearLocations()
         }
+    }
+
+    private fun clearLocations() {
+        adapterLocationView.clearAlLocations()
     }
 
     @SuppressLint("MissingPermission")
     private fun getLastLocation() {
         if (checkPermissions()) {
             if (isLocationEnabled()) {
-                mFusedLocationClient.lastLocation?.addOnCompleteListener(
-                    OnCompleteListener<Location?> { task ->
-                        val location = task.result
-                        if (location == null) {
-                            requestNewLocationData()
-                        } else {
-                            resultTV.text = location.latitude.toString() + " | " + location.longitude.toString()
-                            Log.e("123321", location.latitude.toString() + " | " + location.longitude.toString())}
+                mFusedLocationClient.lastLocation?.addOnCompleteListener { task ->
+                    val location = task.result
+                    if (location == null) {
+                        requestNewLocationData()
+                    } else {
+                        adapterLocationView.addLocationItem(location)
+                        recyclerView.scrollToPosition(0)
                     }
-                )
+                }
             } else {
                 Toast.makeText(this, "Включите GPS", Toast.LENGTH_LONG).show()
                 val intent =
@@ -60,10 +80,10 @@ class MainActivity : AppCompatActivity() {
 
 
     @SuppressLint("MissingPermission")
-    private fun requestNewLocationData() {
+    private fun requestNewLocationData(){
         val mLocationRequest = LocationRequest()
         mLocationRequest.priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-        mLocationRequest.interval = 0
+        mLocationRequest.interval = 1
         mLocationRequest.fastestInterval = 0
         mLocationRequest.numUpdates = 1
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
@@ -76,8 +96,10 @@ class MainActivity : AppCompatActivity() {
     private val mLocationCallback: LocationCallback = object : LocationCallback() {
         override fun onLocationResult(locationResult: LocationResult) {
             val mLastLocation = locationResult.lastLocation
-            resultTV.text = mLastLocation.latitude.toString() + " | " + mLastLocation.longitude.toString()
-            Log.e("123321", mLastLocation.latitude.toString() + " | " + mLastLocation.longitude.toString())
+            if (mLastLocation != null){
+                adapterLocationView.addLocationItem(mLastLocation)
+                recyclerView.scrollToPosition(0)
+            }
         }
     }
 
@@ -111,19 +133,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-//    fun onRequestPermissionsResult(
-//        requestCode: Int,
-//        permissions: Array<String?>?,
-//        grantResults: IntArray
-//    ) {
-//        super.onRequestPermissionsResult(requestCode, permissions!!, grantResults)
-//        if (requestCode == PERMISSION_ID) {
-//            if (grantResults.size > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-//                getLastLocation()
-//            }
-//        }
-//    }
-
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -142,6 +151,52 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         if (checkPermissions()) {
             getLastLocation()
+        }
+    }
+
+    inner class LocationAdapterView : RecyclerView.Adapter<LocationViewHolder>(){
+
+        private val mLocations = mutableListOf<Location>()
+        private val mInflater = LayoutInflater.from(applicationContext)
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): LocationViewHolder {
+            val view = mInflater.inflate(R.layout.item_location_layout, parent, false)
+            return LocationViewHolder(view)
+        }
+
+        override fun getItemCount() : Int {
+            return mLocations.count()
+        }
+
+        override fun onBindViewHolder(holder: LocationViewHolder, position: Int) {
+            holder.onBind(mLocations[position])
+        }
+
+        fun setLocations(listLocations:List<Location>){
+            mLocations.clear()
+            mLocations.addAll(listLocations)
+            notifyDataSetChanged()
+        }
+
+        fun addLocationItem(location:Location) {
+            mLocations.add(0, location)
+            notifyItemInserted(0)
+        }
+
+        fun clearAlLocations() {
+            mLocations.clear()
+            notifyDataSetChanged()
+        }
+    }
+
+    class LocationViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val latitudeTV:TextView = itemView.findViewById<TextView>(R.id.latitudeTV)
+        private val longitudeTV:TextView = itemView.findViewById<TextView>(R.id.longitudeTV)
+        private val datetimeTV:TextView = itemView.findViewById<TextView>(R.id.datetimeTV)
+
+        fun onBind(location:Location){
+            datetimeTV.text = Date().toString()
+            latitudeTV.text = location.latitude.toString()
+            longitudeTV.text = location.longitude.toString()
         }
     }
 }
