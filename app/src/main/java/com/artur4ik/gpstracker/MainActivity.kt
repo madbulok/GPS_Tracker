@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 )
             } else {
-                Toast.makeText(this, "Turn on location", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Включите GPS", Toast.LENGTH_LONG).show()
                 val intent =
                     Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
                 startActivity(intent)
